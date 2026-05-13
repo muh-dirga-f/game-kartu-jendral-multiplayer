@@ -44,19 +44,31 @@ function ensureConfig() {
 
 export async function initFirebase() {
   ensureConfig();
-  app = initializeApp(window.FIREBASE_CONFIG);
-  auth = getAuth(app);
-  db = getDatabase(app);
-  await signInAnonymously(auth);
-  await new Promise((resolve) => {
-    onAuthStateChanged(auth, (u) => {
-      if (u) {
-        user = u;
-        resolve();
-      }
+  try {
+    app = initializeApp(window.FIREBASE_CONFIG);
+    auth = getAuth(app);
+    db = getDatabase(app);
+    console.log("Firebase initialized. DB instance:", db);
+    
+    await signInAnonymously(auth);
+    console.log("Anonymous sign-in initiated");
+    
+    await new Promise((resolve) => {
+      onAuthStateChanged(auth, (u) => {
+        if (u) {
+          user = u;
+          window.CURRENT_USER_UID = u.uid;
+          console.log("User authenticated:", u.uid);
+          resolve();
+        }
+      });
     });
-  });
-  return { app, auth, db, user };
+    console.log("Firebase setup complete. User:", user.uid);
+    return { app, auth, db, user };
+  } catch (err) {
+    console.error("Firebase initialization error:", err);
+    throw err;
+  }
 }
 
 function roomRef(roomId) { return ref(db, `rooms/${roomId}`); }
@@ -75,6 +87,13 @@ export function getCurrentRoomId() {
 }
 
 export async function createRoom({ roomName, playerName, password = "", locked = false }) {
+  if (!user || !user.uid) {
+    throw new Error("User belum terinisialisasi. Silakan refresh halaman.");
+  }
+  if (!db) {
+    throw new Error("Database tidak terinisialisasi. Silakan refresh halaman.");
+  }
+  
   const roomId = makeRoomCode();
   const me = user;
   const data = {
@@ -101,8 +120,19 @@ export async function createRoom({ roomName, playerName, password = "", locked =
     messages: {},
     gameState: null
   };
-  await set(roomRef(roomId), data);
-  return roomId;
+  
+  try {
+    console.log("Creating room", roomId, "with data:", data);
+    const ref_obj = roomRef(roomId);
+    console.log("Room ref created:", ref_obj);
+    
+    await set(ref_obj, data);
+    console.log("Room created and written to Firebase:", roomId);
+    return roomId;
+  } catch (err) {
+    console.error("Error creating room in Firebase:", err);
+    throw err;
+  }
 }
 
 export async function joinRoom(roomId, { playerName, password = "", asAutoJoin = false } = {}) {
@@ -191,14 +221,25 @@ export async function toggleLock(nextValue) {
 export async function startRoomGame() {
   if (!state.roomId) return;
   await update(roomMetaRef(state.roomId), { phase: "playing" });
-  await update(roomRef(state.roomId), {
-    gameState: window.JendralCore ? window.JendralCore.serializeState() : null
-  });
 }
 
 export async function writeGameState(snapshot) {
   if (!state.roomId || !snapshot) return;
-  await set(gameRef(state.roomId), snapshot);
+  try {
+    // Try to construct ordered UID array from players list
+    const playersSnap = await get(playersRef(state.roomId));
+    let uidsOrder = [];
+    if (playersSnap.exists()) {
+      const playersObj = playersSnap.val();
+      const arr = Object.values(playersObj);
+      arr.sort((a, b) => (a.joinedAt || 0) - (b.joinedAt || 0));
+      uidsOrder = arr.map(p => p.uid);
+    }
+    await set(gameRef(state.roomId), { state: snapshot, uids: uidsOrder });
+  } catch (err) {
+    console.error('writeGameState error:', err);
+    await set(gameRef(state.roomId), snapshot);
+  }
 }
 
 export function observeRoom(roomId, handlers) {

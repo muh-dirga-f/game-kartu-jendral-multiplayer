@@ -300,17 +300,38 @@ function pecahGroup(gid) {
 }
 
 function updateHandVisuals(idx) {
-    const p = players[idx]; const g = p.handVisual;
-    if(!g) return; 
-    while(g.children.length > 0) g.remove(g.children[0]);
-    if(p.hand.length === 0) return;
-    
-    const count = p.hand.length; const arc = Math.PI * 0.4;
-    for(let i=0; i<count; i++) {
-        const mesh = new THREE.Mesh(new THREE.PlaneGeometry(0.6, 0.9), new THREE.MeshPhysicalMaterial({ map: BACK_TEX, side: THREE.DoubleSide }));
-        const angle = (i / (count - 1 || 1) - 0.5) * arc;
-        mesh.position.set(Math.sin(angle)*0.7, Math.cos(angle)*0.1, i*0.015);
-        mesh.rotation.z = -angle; mesh.castShadow = true; g.add(mesh);
+    try {
+        const p = players[idx];
+        if (!p) return;
+
+        // Ensure hand is an array
+        if (!Array.isArray(p.hand)) p.hand = [];
+
+        // Try to obtain hand visual group
+        let g = p.handVisual;
+        if (!g && avatars[idx]) {
+            // attempt to find a suitable group in avatar children
+            const found = avatars[idx].children.find(c => c.type === 'Group' && Math.abs((c.position && c.position.y) - 0.8) < 0.01);
+            if (found) {
+                g = found;
+                p.handVisual = g;
+            }
+        }
+        if (!g) return;
+
+        // Clear existing visuals
+        while (g.children && g.children.length > 0) g.remove(g.children[0]);
+        if (p.hand.length === 0) return;
+
+        const count = p.hand.length; const arc = Math.PI * 0.4;
+        for (let i = 0; i < count; i++) {
+            const mesh = new THREE.Mesh(new THREE.PlaneGeometry(0.6, 0.9), new THREE.MeshPhysicalMaterial({ map: BACK_TEX, side: THREE.DoubleSide }));
+            const angle = (i / (count - 1 || 1) - 0.5) * arc;
+            mesh.position.set(Math.sin(angle) * 0.7, Math.cos(angle) * 0.1, i * 0.015);
+            mesh.rotation.z = -angle; mesh.castShadow = true; g.add(mesh);
+        }
+    } catch (err) {
+        console.error('updateHandVisuals error:', err);
     }
 }
 
@@ -551,6 +572,14 @@ function showLeaderboard() {
 }
 
 function checkTurn() {
+    // Defensive: pastikan `gameState` dan `winners` terdefinisi sebelum digunakan
+    if (!gameState || typeof gameState !== 'object') {
+        gameState = { cur: 0, lastMove: null, winners: [], history: [], tableY: 0.45, groupCounter: 1, passCount: 0 };
+    }
+    if (!Array.isArray(gameState.winners)) {
+        gameState.winners = [];
+    }
+
     if (gameState.winners.length === 3) {
         let loserIdx = players.findIndex((p, i) => !gameState.winners.includes(i));
         if(loserIdx !== -1) {
@@ -870,23 +899,70 @@ function serializeState() {
     });
 }
 
-function restoreState(snapshot) {
+function restoreState(snapshot, uids) {
     if (!snapshot || !snapshot.players || !snapshot.gameState) return;
+    // Unwrap if caller passed { state, uids }
+    let payload = snapshot;
+    if (snapshot.state && snapshot.uids) {
+        payload = snapshot.state;
+        uids = snapshot.uids;
+    }
+
     window.__SILENT_MULTIPLAYER_SYNC__ = true;
     try {
-        players = snapshot.players.map((p) => ({
+        // Recreate players array from payload
+        let incomingPlayers = (payload.players || []).map((p) => ({
             ...p,
             pos: new THREE.Vector3(p.pos.x, p.pos.y, p.pos.z),
             hand: p.hand || []
         }));
-        gameState = snapshot.gameState;
-        selectedCards = new Set(snapshot.selectedCards || []);
-        if (players.length !== avatars.length && avatars.length > 0) {
-            // Keep existing avatars count; multiplayer overlay can ignore visual mismatch.
+
+        // Ensure default gameState structure
+        const defaultGameState = { cur: 0, lastMove: null, winners: [], history: [], tableY: 0.45, groupCounter: 1, passCount: 0 };
+        let incomingGameState = Object.assign({}, defaultGameState, payload.gameState || {});
+        if (!Array.isArray(incomingGameState.winners)) incomingGameState.winners = [];
+
+        // If we have UID ordering, rotate players so local user becomes index 0
+        let localIdx = -1;
+        if (Array.isArray(uids) && window.CURRENT_USER_UID) {
+            const n = incomingPlayers.length;
+            localIdx = uids.indexOf(window.CURRENT_USER_UID);
+            if (localIdx > 0 && n > 0) {
+                // Rotate players array
+                const rotated = incomingPlayers.slice(localIdx).concat(incomingPlayers.slice(0, localIdx));
+                incomingPlayers = rotated;
+
+                // Adjust current turn index and winners indices
+                incomingGameState.cur = ((incomingGameState.cur - localIdx) % n + n) % n;
+                incomingGameState.winners = (incomingGameState.winners || []).map(w => ((w - localIdx) % n + n) % n);
+            }
+            // If localIdx === -1, client is a spectator; do not rotate.
         }
+
+        // Assign final players and gameState
+        players = incomingPlayers;
+
+        // If this client is a participant, mark index 0 as human
+        if (localIdx >= 0) {
+            players.forEach((p, i) => p.isHuman = (i === 0));
+        }
+
+        gameState = incomingGameState;
+
+        // Clear selected cards on multiplayer restore (local selection shouldn't be synced)
+        selectedCards = new Set();
+
+        // Rebuild avatars to match players
+        try {
+            avatars.forEach(av => { if (av && av.parent) scene.remove(av); });
+        } catch (e) {}
+        avatars.length = 0;
+        players.forEach(p => avatars.push(createAvatar(p)));
+
+        // Update visuals
         updateUI();
-        updateHandVisuals(0);
-        avatars.forEach((av, i) => av.userData.arrow.visible = (gameState.cur === i));
+        for (let i = 0; i < players.length; i++) updateHandVisuals(i);
+        avatars.forEach((av, i) => { if (av && av.userData && av.userData.arrow) av.userData.arrow.visible = (gameState.cur === i); });
         checkTurn();
     } finally {
         window.__SILENT_MULTIPLAYER_SYNC__ = false;

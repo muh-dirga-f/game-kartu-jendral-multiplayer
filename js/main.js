@@ -116,11 +116,16 @@ async function joinAndEnter(roomId, opts = {}) {
       appendChatMessage(ui.roomChatLog, msg);
       appendChatMessage(ui.playChatLog, msg);
     },
-    onGameState(snapshot) {
-      if (snapshot && window.JendralCore) {
-        window.JendralCore.restoreState(snapshot);
-      }
-    }
+      onGameState(snapshot) {
+        if (snapshot && window.JendralCore) {
+          // Support both old format (raw serialized) and new format { state, uids }
+          if (snapshot.state && snapshot.uids) {
+            window.JendralCore.restoreState(snapshot.state, snapshot.uids);
+          } else {
+            window.JendralCore.restoreState(snapshot);
+          }
+        }
+      },
   });
 }
 
@@ -162,7 +167,12 @@ document.getElementById("multiplayer-btn").addEventListener("click", async () =>
   window.APP_MODE = "multiplayer";
   app.mode = "multiplayer";
   setVisible(ui.lobbyScreen, true);
-  await refreshRooms();
+  try {
+    await initLobby();
+  } catch (err) {
+    console.error("Error initializing lobby:", err);
+    alert("Error: " + (err.message || String(err)));
+  }
 });
 
 document.getElementById("close-lobby-btn").addEventListener("click", () => setVisible(ui.lobbyScreen, false));
@@ -191,17 +201,23 @@ document.getElementById("manual-join-btn").addEventListener("click", async () =>
 document.getElementById("create-room-btn").addEventListener("click", async () => {
   try {
     app.playerName = (document.getElementById("player-name").value || app.playerName).trim();
+    if (!app.playerName) throw new Error("Masukkan nama Anda");
+    
     app.roomName = (document.getElementById("room-name").value || "").trim();
     app.password = (document.getElementById("room-password").value || "").trim();
     app.locked = document.getElementById("room-locked").checked;
+    
+    console.log("Creating room with:", { roomName: app.roomName, playerName: app.playerName });
     const roomId = await createRoom({
       roomName: app.roomName,
       playerName: app.playerName,
       password: app.password,
       locked: app.locked
     });
+    console.log("Room created:", roomId);
     await joinAndEnter(roomId);
   } catch (err) {
+    console.error("Error creating room:", err);
     alert(err.message || String(err));
   }
 });
@@ -224,12 +240,21 @@ document.getElementById("toggle-lock-btn").addEventListener("click", async () =>
 });
 
 document.getElementById("start-room-btn").addEventListener("click", async () => {
-  await startRoomGame();
-  if (window.JendralCore) {
-    window.JendralCore.notifyStateChange();
+  try {
+    await startRoomGame();
+    // Start the actual game locally (dealing, etc.) so host runs the engine.
+    if (window.JendralCore && typeof window.JendralCore.startNewRound === 'function') {
+      window.JendralCore.startNewRound();
+    } else {
+      // Fallback: trigger state sync if engine not present
+      window.JendralCore && window.JendralCore.notifyStateChange && window.JendralCore.notifyStateChange();
+    }
+    setVisible(ui.roomScreen, false);
+    setVisible(ui.lobbyScreen, false);
+  } catch (err) {
+    console.error('Error starting room game:', err);
+    alert(err.message || String(err));
   }
-  setVisible(ui.roomScreen, false);
-  setVisible(ui.lobbyScreen, false);
 });
 
 document.getElementById("toggle-chat-btn").addEventListener("click", () => {
