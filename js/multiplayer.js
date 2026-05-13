@@ -23,7 +23,6 @@ import {
   serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-database.js";
 
-const defaultConfig = window.FIREBASE_CONFIG || {};
 let app = null;
 let auth = null;
 let db = null;
@@ -38,14 +37,14 @@ const state = {
 };
 
 function ensureConfig() {
-  if (!defaultConfig.apiKey) {
+  if (!window.FIREBASE_CONFIG || !window.FIREBASE_CONFIG.apiKey) {
     throw new Error("Isi window.FIREBASE_CONFIG dulu di main.js");
   }
 }
 
 export async function initFirebase() {
   ensureConfig();
-  app = initializeApp(defaultConfig);
+  app = initializeApp(window.FIREBASE_CONFIG);
   auth = getAuth(app);
   db = getDatabase(app);
   await signInAnonymously(auth);

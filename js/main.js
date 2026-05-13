@@ -15,15 +15,6 @@ import {
   sendAction
 } from "./multiplayer.js";
 
-window.FIREBASE_CONFIG = window.FIREBASE_CONFIG || {
-  // Isi dengan config Firebase Anda
-  apiKey: "PASTE_API_KEY",
-  authDomain: "PASTE_AUTH_DOMAIN",
-  databaseURL: "PASTE_DATABASE_URL",
-  projectId: "PASTE_PROJECT_ID",
-  appId: "PASTE_APP_ID"
-};
-
 const ui = {
   startScreen: document.getElementById("start-screen"),
   lobbyScreen: document.getElementById("lobby-screen"),
@@ -63,7 +54,7 @@ function appendChatMessage(target, msg) {
 }
 
 function escapeHtml(str) {
-  return String(str).replace(/[&<>'"]/g, s => ({ "&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;",""":"&quot;" }[s]));
+  return String(str).replace(/[&<>'"]/g, s => ({ "&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;","\"":"&quot;" }[s]));
 }
 
 async function refreshRooms() {
