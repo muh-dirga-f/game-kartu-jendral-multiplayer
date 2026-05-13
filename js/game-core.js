@@ -725,7 +725,7 @@ document.getElementById('restart-btn').onclick = () => {
     startNewRound();
 };
 
-function startNewRound() {
+function startNewRound(onDealingComplete) {
     if(aiTimeout) clearTimeout(aiTimeout);
     pendingUIUpdate = false;
     draggedCardIdx = null;
@@ -815,6 +815,16 @@ function startNewRound() {
         addLog("Game Mulai (Pembuka: 3♣)", "#10b981"); 
         sfx.turnChange(); 
         checkTurn();
+
+        // Notify multiplayer that game state is ready to sync
+        if (window.JendralCore && window.JendralCore.notifyStateChange) {
+            window.JendralCore.notifyStateChange();
+        }
+
+        // Call optional callback (used by multiplayer to trigger DB write)
+        if (typeof onDealingComplete === 'function') {
+            setTimeout(() => onDealingComplete(), 100);
+        }
     }
 }
 

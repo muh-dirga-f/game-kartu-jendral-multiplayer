@@ -242,13 +242,22 @@ document.getElementById("toggle-lock-btn").addEventListener("click", async () =>
 document.getElementById("start-room-btn").addEventListener("click", async () => {
   try {
     await startRoomGame();
-    // Start the actual game locally (dealing, etc.) so host runs the engine.
+    
+    // Start the actual game locally with callback to sync state after dealing
     if (window.JendralCore && typeof window.JendralCore.startNewRound === 'function') {
-      window.JendralCore.startNewRound();
+      console.log("Starting new round with dealing callback");
+      const dealingCallback = async () => {
+        console.log("Dealing complete, syncing state to Firebase");
+        if (window.JendralCore && window.JendralCore.serializeState) {
+          const state = window.JendralCore.serializeState();
+          await writeGameState(state);
+        }
+      };
+      window.JendralCore.startNewRound(dealingCallback);
     } else {
-      // Fallback: trigger state sync if engine not present
-      window.JendralCore && window.JendralCore.notifyStateChange && window.JendralCore.notifyStateChange();
+      console.warn("JendralCore.startNewRound not available");
     }
+    
     setVisible(ui.roomScreen, false);
     setVisible(ui.lobbyScreen, false);
   } catch (err) {
@@ -271,12 +280,6 @@ window.addEventListener("jendral:state-change", async (e) => {
 window.addEventListener("jendral:open-lobby", async () => {
   setVisible(ui.lobbyScreen, true);
   await refreshRooms();
-});
-
-window.addEventListener("jendral:state-change", async (e) => {
-  if (window.APP_MODE !== "multiplayer") return;
-  if (!getCurrentRoomId()) return;
-  await writeGameState(e.detail);
 });
 
 await initLobby();
