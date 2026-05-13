@@ -1,0 +1,308 @@
+:root {
+        --primary: #38bdf8;
+        --accent: #fbbf24;
+        --danger: #ef4444;
+        --ai-color: #a855f7;
+        --glass-bg: rgba(15, 23, 42, 0.75);
+        --glass-border: rgba(255, 255, 255, 0.15);
+    }
+    
+    * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
+    body { overflow: hidden; background: #050b14; font-family: 'Segoe UI', system-ui, sans-serif; color: #fff; }
+    
+    #ui { position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 100; display: none; }
+    
+    #start-screen {
+        position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+        background: rgba(5, 11, 20, 0.95);
+        display: flex; flex-direction: column; align-items: center; justify-content: center;
+        z-index: 200; backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); text-align: center;
+    }
+    #start-screen h1 { color: var(--accent); font-size: 3.5em; margin-bottom: 20px; text-shadow: 0 0 20px rgba(251, 191, 36, 0.6); letter-spacing: 2px; }
+    #start-screen button {
+        padding: 18px 45px; font-size: 1.3em; font-weight: 900; color: #fff; letter-spacing: 1.5px;
+        background: linear-gradient(135deg, #10b981, #047857); border: 2px solid #34d399; border-radius: 15px;
+        cursor: pointer; box-shadow: 0 10px 30px rgba(16, 185, 129, 0.5); transition: 0.3s;
+    }
+    #start-screen button:hover { transform: scale(1.05); box-shadow: 0 15px 40px rgba(16, 185, 129, 0.7); }
+
+    #rules-btn {
+        margin-top: 20px; padding: 12px 30px !important; font-size: 1.1em !important;
+        background: linear-gradient(135deg, #3b82f6, #1d4ed8) !important; border: 2px solid #60a5fa !important;
+        box-shadow: 0 10px 30px rgba(59, 130, 246, 0.4) !important;
+    }
+
+    /* System Modals */
+    .modal-overlay {
+        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+        background: rgba(0, 0, 0, 0.85); z-index: 3000;
+        display: none; justify-content: center; align-items: center;
+        backdrop-filter: blur(8px); pointer-events: auto;
+    }
+    
+    .rules-content {
+        width: 90%; max-width: 600px; max-height: 85vh; overflow-y: auto;
+        background: rgba(15, 23, 42, 0.95); padding: 30px; text-align: left;
+        border: 2px solid var(--primary); box-shadow: 0 0 30px rgba(56, 189, 248, 0.3);
+        border-radius: 20px; scrollbar-width: thin; pointer-events: auto;
+    }
+    .rules-content h2 { color: var(--accent); margin-bottom: 20px; text-align: center; font-size: 1.8em; }
+    .rules-content h3 { color: var(--primary); margin-top: 15px; margin-bottom: 8px; font-size: 1.2em; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 5px; }
+    .rules-content p, .rules-content li { font-size: 14px; line-height: 1.6; color: #e2e8f0; margin-bottom: 8px; }
+    .rules-content ul { padding-left: 20px; margin-bottom: 15px; }
+    .rules-content strong { color: #fff; }
+    
+    #close-rules-btn {
+        display: block; margin: 25px auto 0; padding: 12px 40px;
+        background: var(--danger); border: none; border-radius: 10px;
+        color: #fff; font-weight: bold; cursor: pointer; font-size: 1.1em; transition: 0.2s;
+    }
+    #close-rules-btn:hover { background: #b91c1c; transform: scale(1.05); }
+
+    /* Leaderboard Styles */
+    #game-over-modal .rules-content { text-align: center; border-color: var(--accent); }
+    .rank-item {
+        display: flex; justify-content: space-between; align-items: center;
+        padding: 15px 25px; margin-bottom: 12px; background: rgba(255,255,255,0.05);
+        border-radius: 12px; font-size: 1.3em; font-weight: bold;
+    }
+    .rank-1 { color: #fbbf24; border-left: 6px solid #fbbf24; background: rgba(251, 191, 36, 0.1); transform: scale(1.05); }
+    .rank-2 { color: #94a3b8; border-left: 6px solid #94a3b8; }
+    .rank-3 { color: #b45309; border-left: 6px solid #b45309; }
+    .rank-4 { color: #ef4444; border-left: 6px solid #ef4444; background: rgba(239, 68, 68, 0.1); opacity: 0.8; }
+    
+    #restart-btn {
+        margin-top: 25px; padding: 15px 40px; font-size: 1.2em; font-weight: 900; color: #fff; letter-spacing: 1.5px;
+        background: linear-gradient(135deg, #10b981, #047857); border: none; border-radius: 12px;
+        cursor: pointer; box-shadow: 0 10px 30px rgba(16, 185, 129, 0.5); transition: 0.3s;
+    }
+    #restart-btn:hover { transform: scale(1.05); filter: brightness(1.1); }
+
+    /* Panel UI */
+    .panel {
+        background: var(--glass-bg); border: 1px solid var(--glass-border);
+        backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+        border-radius: 20px; padding: 20px; pointer-events: auto; box-shadow: 0 15px 35px rgba(0, 0, 0, 0.6);
+    }
+    
+    #top-left { position: absolute; top: 25px; left: 25px; width: 300px; border-left: 5px solid var(--accent); }
+    #top-left h2 { color: var(--accent); font-size: 1.5em; margin-bottom: 8px; letter-spacing: 1px; font-weight: 900; }
+    #status { font-weight: 800; color: var(--primary); font-size: 15px; transition: 0.3s; }
+    #stats { margin-top: 15px; font-size: 13px; line-height: 1.8; color: #cbd5e1; }
+    
+    #log-panel { position: absolute; top: 25px; right: 25px; width: 320px; height: 220px; overflow-y: auto; display: flex; flex-direction: column-reverse; font-size: 13px; padding: 15px; scrollbar-width: thin; z-index: 100; }
+    #log-panel div { padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.05); animation: slideIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+    @keyframes slideIn { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
+
+    /* Controls & Hand */
+    #controls { 
+        position: absolute; bottom: 0; left: 0; width: 100%; 
+        display: flex; justify-content: center; align-items: center; gap: 15px; 
+        pointer-events: auto; z-index: 2000; 
+        background: var(--glass-bg);
+        backdrop-filter: blur(25px); -webkit-backdrop-filter: blur(25px);
+        border-top: 1px solid var(--glass-border);
+        padding: 15px 10px;
+        box-shadow: 0 -10px 40px rgba(0,0,0,0.5);
+        transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+    
+    button.btn {
+        border: none; padding: 12px 25px; border-radius: 10px; color: #fff; font-weight: 900; font-size: 14px;
+        cursor: pointer; text-transform: uppercase; letter-spacing: 1px; transition: all 0.2s;
+        box-shadow: 0 8px 15px rgba(0,0,0,0.3);
+    }
+    #playBtn { background: linear-gradient(135deg, #10b981, #047857); }
+    #passBtn { background: linear-gradient(135deg, #64748b, #334155); }
+    #sortBtn { background: linear-gradient(135deg, #3b82f6, #1d4ed8); }
+    button.btn:hover { transform: translateY(-3px); filter: brightness(1.1); }
+    button.btn:active { transform: translateY(1px); }
+
+    #hand { 
+        position: absolute; bottom: 90px; left: 50%; transform: translateX(-50%); 
+        display: flex; gap: 12px; pointer-events: auto; max-width: 98vw; 
+        padding: 40px 15px 15px 15px; align-items: flex-end; overflow-x: auto; 
+        z-index: 50; transition: 0.3s;
+    }
+
+    /* FIX: Saat drag berlangsung, area hand menerima drop event */
+    #hand.drag-active { outline: 2px dashed rgba(56,189,248,0.3); border-radius: 16px; }
+    
+    .bracket { 
+        display: flex; gap: 6px; background: rgba(255,255,255,0.06); 
+        padding: 35px 15px 15px 15px; 
+        border-radius: 16px; border: 2px dashed rgba(255,255,255,0.2); 
+        position: relative; transition: 0.3s; margin-top: 15px;
+    }
+    .bracket:hover { background: rgba(255,255,255,0.12); border-color: var(--primary); }
+    
+    .bracket-label { 
+        position: absolute; top: -14px; left: 50%; transform: translateX(-50%); 
+        font-size: 11px; font-weight: 900; color: #fff; white-space: nowrap; 
+        background: var(--primary); padding: 4px 15px; border-radius: 15px; 
+        box-shadow: 0 4px 10px rgba(0,0,0,0.4); z-index: 5; 
+    }
+    
+    .break-btn { 
+        position: absolute; top: 8px; right: 10px; background: var(--danger); color: #fff; 
+        border: none; border-radius: 6px; padding: 5px 12px; 
+        font-size: 10px; font-weight: bold; cursor: pointer; display: none; align-items: center; 
+        justify-content: center; box-shadow: 0 4px 10px rgba(239, 68, 68, 0.5); 
+        transition: 0.2s; letter-spacing: 1px; z-index: 50; 
+    }
+    .break-btn:hover { background: #b91c1c; transform: translateY(-2px); }
+    .bracket:hover .break-btn { display: flex; }
+
+    #ingame-restart-btn {
+        background: var(--danger); color: #fff; border: none; border-radius: 8px; padding: 6px 12px; cursor: pointer; font-weight: bold; font-size: 16px; transition: 0.2s; box-shadow: 0 4px 10px rgba(239, 68, 68, 0.4);
+    }
+    #ingame-restart-btn:hover { background: #b91c1c; transform: scale(1.1); }
+
+    .crd {
+        min-width: 75px; height: 110px; background: #fff; color: #111; border-radius: 10px; padding: 8px;
+        display: flex; flex-direction: column; justify-content: space-between; cursor: grab;
+        transition: transform 0.1s, box-shadow 0.1s; box-shadow: 0 8px 20px rgba(0,0,0,0.5); position: relative;
+    }
+    .crd:active { cursor: grabbing; }
+    .crd.sel { transform: translateY(-25px); box-shadow: 0 15px 30px rgba(56,189,248,0.5), 0 0 0 3px var(--primary); z-index: 10; }
+    .crd.red { color: #e11d48; }
+    /* FIX: Semua elemen child kartu tidak boleh menerima pointer event,
+       agar drag target selalu ke elemen .crd itu sendiri, bukan textnya */
+    .crd > * { pointer-events: none; }
+    
+    .crd.joker-red { background: linear-gradient(135deg, #fffbeb 0%, #fcd34d 50%, #b45309 100%); color: #78350f; border: 3px solid #b45309; box-shadow: 0 8px 20px rgba(180, 83, 9, 0.4); }
+    .crd.joker-black { background: linear-gradient(135deg, #f1f5f9 0%, #94a3b8 50%, #1e293b 100%); border: 3px solid #1e293b; color: #0f172a; box-shadow: 0 8px 20px rgba(30, 41, 59, 0.4); }
+    
+    .crd span:first-child { font-size: 1.1em; font-weight: 900; }
+    .crd span:last-child { font-size: 2.2em; align-self: center; }
+
+    #tip { position: fixed; top: 35%; left: 50%; transform: translate(-50%, -50%); font-size: 40px; font-weight: 900; opacity: 0; transition: 0.4s; text-shadow: 0 5px 20px rgba(0,0,0,0.8); pointer-events: none; z-index: 1000; letter-spacing: 1px; text-align: center; }
+
+/* multiplayer / lobby */
+.hidden { display: none !important; }
+
+.lobby-shell, .room-shell {
+  width: min(1100px, 96vw);
+  max-height: 90vh;
+  overflow: auto;
+  background: rgba(15, 23, 42, 0.95);
+  border: 1px solid rgba(255,255,255,0.12);
+}
+
+.lobby-header, .room-top, .lobby-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.lobby-grid, .room-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 16px;
+  margin-top: 18px;
+}
+
+.room-grid { grid-template-columns: 1fr 1fr; }
+
+.lobby-card, .room-card {
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 16px;
+  padding: 16px;
+  min-height: 260px;
+}
+
+.field, .checkbox {
+  display: block;
+  margin-top: 12px;
+  color: #cbd5e1;
+  font-size: 13px;
+}
+
+.field input {
+  width: 100%;
+  margin-top: 6px;
+  border-radius: 10px;
+  padding: 12px 14px;
+  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(15,23,42,0.7);
+  color: #fff;
+}
+
+.room-list, .players-list, .chat-log {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.room-item, .player-item, .chat-item {
+  border-radius: 12px;
+  background: rgba(255,255,255,0.05);
+  padding: 10px 12px;
+  border: 1px solid rgba(255,255,255,0.08);
+}
+
+.room-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+}
+
+.room-meta, .muted {
+  color: #94a3b8;
+  font-size: 12px;
+}
+
+.btn-primary { background: linear-gradient(135deg, #3b82f6, #1d4ed8); }
+.btn-secondary { background: linear-gradient(135deg, #64748b, #334155); }
+.btn-success { background: linear-gradient(135deg, #10b981, #047857); }
+.btn-danger { background: linear-gradient(135deg, #ef4444, #b91c1c); }
+
+.chat-float {
+  position: fixed;
+  right: 18px;
+  bottom: 88px;
+  width: 320px;
+  z-index: 2500;
+  pointer-events: auto;
+}
+
+.chat-float-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.mini-btn {
+  border: none;
+  background: rgba(255,255,255,0.08);
+  color: #fff;
+  border-radius: 8px;
+  width: 28px;
+  height: 28px;
+  cursor: pointer;
+}
+
+.small { max-height: 220px; overflow: auto; }
+
+.chat-input-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.chat-input-row input {
+  flex: 1;
+  border-radius: 10px;
+  padding: 11px 12px;
+  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(15,23,42,0.7);
+  color: #fff;
+}
+
+#start-screen {
+  gap: 8px;
+}

@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Jendral Deluxe Pro 3D</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div id="start-screen">
+    <h1>♠ JENDRAL DELUXE</h1>
+    <p style="margin-bottom: 10px; font-size: 1.2em; color: #cbd5e1;">Siapkan Diri Anda, Jendral.</p>
+    <button id="start-game-btn">SINGLE PLAYER</button>
+    <button id="multiplayer-btn" style="margin-top:12px;padding:18px 45px;font-size:1.3em;font-weight:900;color:#fff;letter-spacing:1.5px;background:linear-gradient(135deg,#7c3aed,#4c1d95);border:2px solid #c084fc;border-radius:15px;cursor:pointer;box-shadow:0 10px 30px rgba(124,58,237,.5);">MULTIPLAYER</button>
+    <button id="rules-btn">📖 ATURAN MAIN</button>
+  </div>
+
+  <div id="lobby-screen" class="modal-overlay">
+    <div class="panel lobby-shell">
+      <div class="lobby-header">
+        <h2>Multiplayer Lobby</h2>
+        <button id="close-lobby-btn" class="btn">TUTUP</button>
+      </div>
+      <div class="lobby-grid">
+        <section class="lobby-card">
+          <h3>Gabung Cepat</h3>
+          <button id="auto-join-btn" class="btn btn-primary">Cari Room Acak</button>
+          <label class="field">
+            <span>Kode Room</span>
+            <input id="manual-room-code" placeholder="Contoh: AB12CD" maxlength="12" />
+          </label>
+          <button id="manual-join-btn" class="btn btn-secondary">Gabung Room</button>
+        </section>
+        <section class="lobby-card">
+          <h3>Buat Room</h3>
+          <label class="field"><span>Nama Anda</span><input id="player-name" placeholder="Dirga" maxlength="20" /></label>
+          <label class="field"><span>Nama Room</span><input id="room-name" placeholder="Room Santai" maxlength="30" /></label>
+          <label class="field"><span>Password Room</span><input id="room-password" type="password" placeholder="Kosongkan jika terbuka" maxlength="32" /></label>
+          <label class="checkbox"><input id="room-locked" type="checkbox" /> Room terkunci</label>
+          <button id="create-room-btn" class="btn btn-success">Buat Room</button>
+        </section>
+        <section class="lobby-card">
+          <h3>Daftar Room</h3>
+          <div id="room-list" class="room-list"></div>
+        </section>
+      </div>
+      <div class="lobby-footer">
+        <small>Room terkunci tidak akan dipilih oleh auto-join.</small>
+      </div>
+    </div>
+  </div>
+
+  <div id="room-screen" class="modal-overlay">
+    <div class="panel room-shell">
+      <div class="room-top">
+        <div>
+          <h2 id="room-title">Room</h2>
+          <div id="room-subtitle" class="muted"></div>
+        </div>
+        <div class="room-actions">
+          <button id="toggle-lock-btn" class="btn btn-secondary">Kunci / Buka</button>
+          <button id="start-room-btn" class="btn btn-success">Mulai Game</button>
+          <button id="leave-room-btn" class="btn btn-danger">Keluar</button>
+        </div>
+      </div>
+      <div class="room-grid">
+        <section class="room-card">
+          <h3>Player</h3>
+          <div id="room-players" class="players-list"></div>
+        </section>
+        <section class="room-card">
+          <h3>Chat Room</h3>
+          <div id="room-chat-log" class="chat-log"></div>
+          <div class="chat-input-row">
+            <input id="room-chat-input" placeholder="Tulis pesan..." />
+            <button id="room-chat-send" class="btn btn-primary">Kirim</button>
+          </div>
+        </section>
+      </div>
+    </div>
+  </div>
+
+  <div id="confirm-modal" class="modal-overlay">
+    <div class="panel" style="text-align: center; max-width: 400px; padding: 30px;">
+      <h3 style="color: var(--accent); margin-bottom: 20px; font-size: 1.5em;">Konfirmasi Restart</h3>
+      <p style="margin-bottom: 25px; font-size: 16px; color: #e2e8f0;">Apakah Anda yakin ingin menyapu meja dan mengulang permainan dari awal?</p>
+      <div style="display: flex; justify-content: center; gap: 15px;">
+        <button id="confirm-yes" class="btn" style="background: var(--danger);">YA, RESTART</button>
+        <button id="confirm-no" class="btn" style="background: #475569;">BATAL</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="game-over-modal" class="modal-overlay">
+    <div class="rules-content panel">
+      <h2>🏆 PAPAN PERINGKAT 🏆</h2>
+      <div id="leaderboard-list"></div>
+      <button id="restart-btn">MAIN LAGI</button>
+    </div>
+  </div>
+
+  <div id="rules-modal" class="modal-overlay">
+    <div class="rules-content panel">
+      <h2>📖 Aturan Main Jendral</h2>
+      <h3>Tujuan Permainan</h3>
+      <p>Jadilah yang pertama menghabiskan semua kartu di tangan. Pemain yang kartunya habis duluan adalah pemenangnya!</p>
+      <h3>Urutan Kartu (Lemah ke Kuat)</h3>
+      <ul>
+        <li><strong>Angka:</strong> 3, 4, 5, 6, 7, 8, 9, 10, J, Q, K, A, 2</li>
+        <li><strong>Bunga:</strong> ♣ (Keriting), ♦ (Wajik), ♥ (Hati), ♠ (Sekop)</li>
+        <li><strong>Joker Hitam:</strong> Hanya bisa menantang kartu satuan <strong>Hitam</strong> (♣/♠).</li>
+        <li><strong>Joker Merah:</strong> Hanya bisa menantang kartu satuan <strong>Merah</strong> (♦/♥) <strong>maupun</strong> Joker Hitam.</li>
+      </ul>
+      <h3>Kombinasi Jalan</h3>
+      <p>Anda hanya bisa membalas serangan dengan <strong>kombinasi yang sama</strong> namun dengan <strong>nilai yang lebih besar</strong>.</p>
+      <ul>
+        <li><strong>Single:</strong> 1 Kartu satuan.</li>
+        <li><strong>Seri Bunga:</strong> Minimal 3 kartu berurutan dengan bunga yang <strong>SAMA</strong> (Contoh: 3♣-4♣-5♣).</li>
+        <li><strong>Tris:</strong> 3 Kartu dengan angka yang sama (Contoh: 7-7-7).</li>
+        <li><strong>Full House (Tris + Pair):</strong> 3 Kartu sama + 2 Kartu sama.</li>
+      </ul>
+      <h3>Hak Waris & Pass</h3>
+      <p>Jika Anda tidak punya kartu balasan (atau ingin menahan kartu strategi), tekan <strong>PASS</strong>. Jika semua pemain lain memilih Pass, maka meja dibersihkan dan pemain terakhir yang membuang kartu mendapatkan <strong>🌟 Hak Waris</strong>.</p>
+      <button id="close-rules-btn">MENGERTI, SIAP MAIN!</button>
+    </div>
+  </div>
+
+  <div id="ui">
+    <div id="top-left" class="panel">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 8px;">
+        <h2 style="margin-bottom: 0;">♠ JENDRAL DELUXE</h2>
+        <button id="ingame-restart-btn" title="Mulai Ulang Pertandingan">↻</button>
+      </div>
+      <div id="status">Menghubungkan Matrix...</div>
+      <div id="stats"></div>
+    </div>
+    <div id="log-panel" class="panel"></div>
+    <div id="tip"></div>
+    <div id="controls">
+      <button id="playBtn" class="btn">MAIN</button>
+      <button id="passBtn" class="btn">PASS</button>
+      <button id="sortBtn" class="btn">SUSUN</button>
+    </div>
+    <div id="hand"></div>
+
+    <div id="room-chat-float" class="panel chat-float">
+      <div class="chat-float-head">
+        <strong>Chat</strong>
+        <button id="toggle-chat-btn" class="mini-btn">−</button>
+      </div>
+      <div id="play-chat-log" class="chat-log small"></div>
+      <div class="chat-input-row">
+        <input id="play-chat-input" placeholder="Ketik pesan..." />
+        <button id="play-chat-send" class="btn btn-primary">Kirim</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/game-core.js"></script>
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
