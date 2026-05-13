@@ -1,287 +1,87 @@
-import {
-  initFirebase,
-  createRoom,
-  joinRoom,
-  autoJoinRoom,
-  leaveRoom,
-  listOpenRooms,
-  sendChat,
-  toggleLock,
-  startRoomGame,
-  writeGameState,
-  observeRoom,
-  upsertPlayerProfile,
-  getCurrentRoomId,
-  sendAction
-} from "./multiplayer.js";
+import { initNetwork, getUser } from "./multiplayer/network.js";
+import { createRoom, joinRoom, claimHost } from "./multiplayer/room-manager.js";
+import { observeRoom, startGameAsHost, playCardAsHost, passAsHost } from "./multiplayer/sync-engine.js";
+import { renderPlayers } from "./render/player-renderer.js";
+import { renderHands } from "./render/hand-renderer.js";
+import { renderTable } from "./render/table-renderer.js";
+import { pulse } from "./render/animation.js";
+
+const state = { roomId: null, room: null, isHost: false, selectedCardId: null };
 
 const ui = {
-  startScreen: document.getElementById("start-screen"),
-  lobbyScreen: document.getElementById("lobby-screen"),
-  roomScreen: document.getElementById("room-screen"),
-  roomList: document.getElementById("room-list"),
-  roomTitle: document.getElementById("room-title"),
-  roomSubtitle: document.getElementById("room-subtitle"),
-  roomPlayers: document.getElementById("room-players"),
-  roomChatLog: document.getElementById("room-chat-log"),
-  roomChatInput: document.getElementById("room-chat-input"),
-  roomChatSend: document.getElementById("room-chat-send"),
-  playChatLog: document.getElementById("play-chat-log"),
-  playChatInput: document.getElementById("play-chat-input"),
-  playChatSend: document.getElementById("play-chat-send")
+  lobby: document.getElementById("lobby-screen"),
+  room: document.getElementById("room-screen"),
+  playerName: document.getElementById("player-name"),
+  roomCode: document.getElementById("manual-room-code"),
+  players: document.getElementById("room-players"),
+  gameState: document.getElementById("status"),
+  hand: document.getElementById("hand")
 };
 
-const app = {
-  mode: "single",
-  roomId: null,
-  playerName: localStorage.getItem("jendral_player_name") || "Player",
-  roomName: "",
-  locked: false,
-  password: ""
-};
+function roomCode() { return Math.random().toString(36).slice(2, 8).toUpperCase(); }
+async function init() { await initNetwork(window.FIREBASE_CONFIG); }
 
-function setVisible(el, yes) {
-  if (!el) return;
-  el.style.display = yes ? "flex" : "none";
+function render() {
+  if (!state.room) return;
+  const players = Object.values(state.room.players || {}).sort((a, b) => a.position - b.position);
+  const me = getUser().uid;
+
+  const myHand = state.room.game?.hands?.[me] || [];
+  if (state.selectedCardId && !myHand.some((c) => c.id === state.selectedCardId)) state.selectedCardId = null;
+
+  renderPlayers(ui.players, players, me);
+  renderTable(ui.gameState, state.room.game, players.find((p) => p.id === state.room.game?.currentTurn)?.name);
+  renderHands(ui.hand, players, state.room.game?.hands || {}, me, state.selectedCardId, (cardId) => {
+    state.selectedCardId = cardId;
+    render();
+  });
+  pulse(ui.players);
 }
 
-function appendChatMessage(target, msg) {
-  const item = document.createElement("div");
-  item.className = "chat-item";
-  const name = msg.system ? "System" : (msg.name || "Player");
-  item.innerHTML = `<div><strong>${name}</strong> <span class="muted">${msg.ts ? new Date(msg.ts).toLocaleTimeString() : ""}</span></div><div>${escapeHtml(msg.text || "")}</div>`;
-  target.prepend(item);
-}
-
-function escapeHtml(str) {
-  return String(str).replace(/[&<>'"]/g, s => ({ "&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;","\"":"&quot;" }[s]));
-}
-
-async function refreshRooms() {
-  const rooms = await listOpenRooms();
-  ui.roomList.innerHTML = "";
-  if (!rooms.length) {
-    ui.roomList.innerHTML = `<div class="muted">Belum ada room terbuka.</div>`;
-    return;
-  }
-  for (const room of rooms) {
-    const row = document.createElement("div");
-    row.className = "room-item";
-    row.innerHTML = `
-      <div>
-        <div><strong>${escapeHtml(room.name)}</strong> ${room.locked ? "🔒" : ""}</div>
-        <div class="room-meta">${room.roomId} • ${room.playersCount}/4 • ${escapeHtml(room.hostName || "")}</div>
-      </div>
-      <button class="btn btn-primary">Gabung</button>
-    `;
-    row.querySelector("button").onclick = async () => {
-      try {
-        app.mode = "multiplayer";
-        await joinAndEnter(room.roomId);
-      } catch (err) {
-        alert(err.message || String(err));
-      }
-    };
-    ui.roomList.appendChild(row);
-  }
-}
-
-async function joinAndEnter(roomId, opts = {}) {
-  localStorage.setItem("jendral_player_name", app.playerName);
-  await joinRoom(roomId, { playerName: app.playerName, password: app.password || "", asAutoJoin: !!opts.auto });
-  app.roomId = roomId;
-  enterRoomUI(roomId);
-  observeRoom(roomId, {
-    onMeta(meta) {
-      if (!meta) return;
-      ui.roomTitle.textContent = `${meta.roomName || roomId} ${meta.locked ? "🔒" : ""}`;
-      ui.roomSubtitle.textContent = `Room ${roomId} • ${meta.phase || "lobby"}`;
-      app.locked = !!meta.locked;
-    },
-    onPlayers(players) {
-      ui.roomPlayers.innerHTML = "";
-      const list = Object.values(players || {});
-      if (!list.length) {
-        ui.roomPlayers.innerHTML = `<div class="muted">Belum ada player.</div>`;
-        return;
-      }
-      list.sort((a,b) => (a.joinedAt || 0) - (b.joinedAt || 0)).forEach((p) => {
-        const div = document.createElement("div");
-        div.className = "player-item";
-        div.textContent = `${p.name}${p.host ? " (host)" : ""}${p.ready ? " • ready" : ""}`;
-        ui.roomPlayers.appendChild(div);
-      });
-    },
-    onMessage(msg) {
-      appendChatMessage(ui.roomChatLog, msg);
-      appendChatMessage(ui.playChatLog, msg);
-    },
-      onGameState(snapshot) {
-        if (snapshot && window.JendralCore) {
-          // Support both old format (raw serialized) and new format { state, uids }
-          if (snapshot.state && snapshot.uids) {
-            window.JendralCore.restoreState(snapshot.state, snapshot.uids);
-          } else {
-            window.JendralCore.restoreState(snapshot);
-          }
-        }
-      },
+function bindRoom(roomId) {
+  state.roomId = roomId;
+  observeRoom(roomId, (room) => {
+    state.room = room;
+    render();
   });
 }
 
-function enterRoomUI(roomId) {
-  setVisible(ui.lobbyScreen, false);
-  setVisible(ui.roomScreen, true);
-  setVisible(ui.startScreen, false);
-  if (window.APP_MODE === "multiplayer") {
-    document.getElementById("ui").style.display = "block";
-  }
-  ui.roomChatLog.innerHTML = "";
-  ui.playChatLog.innerHTML = "";
-}
+document.getElementById("multiplayer-btn").onclick = () => { ui.lobby.style.display = "flex"; };
+document.getElementById("create-room-btn").onclick = async () => {
+  const code = roomCode();
+  await createRoom(code, ui.playerName.value || "Player", "🛡️");
+  state.isHost = await claimHost(code);
+  bindRoom(code);
+  ui.room.style.display = "flex";
+  ui.lobby.style.display = "none";
+};
+document.getElementById("manual-join-btn").onclick = async () => {
+  const code = (ui.roomCode.value || "").toUpperCase();
+  await joinRoom(code, ui.playerName.value || "Player", "🎴");
+  state.isHost = await claimHost(code);
+  bindRoom(code);
+  ui.room.style.display = "flex";
+  ui.lobby.style.display = "none";
+};
+document.getElementById("auto-join-btn").onclick = () => alert("Auto join dihapus demi arsitektur stabil.");
+document.getElementById("toggle-lock-btn").remove();
 
-async function sendRoomChat() {
-  const text = ui.roomChatInput.value.trim();
-  if (!text) return;
-  ui.roomChatInput.value = "";
-  await sendChat(text);
-}
+document.getElementById("start-room-btn").onclick = async () => {
+  if (!state.isHost || !state.room) return;
+  await startGameAsHost(state.roomId, state.room);
+};
 
-async function sendPlayChat() {
-  const text = ui.playChatInput.value.trim();
-  if (!text) return;
-  ui.playChatInput.value = "";
-  await sendChat(text);
-}
+document.getElementById("playBtn").onclick = async () => {
+  if (!state.isHost || !state.room || !state.selectedCardId) return;
+  await playCardAsHost(state.roomId, state.room, getUser().uid, state.selectedCardId);
+};
 
-async function initLobby() {
-  await initFirebase();
-  await refreshRooms();
-}
+document.getElementById("passBtn").onclick = async () => {
+  if (!state.isHost || !state.room) return;
+  await passAsHost(state.roomId, state.room, getUser().uid);
+};
 
-document.getElementById("start-game-btn").addEventListener("click", () => {
-  window.APP_MODE = "single";
-});
+document.getElementById("leave-room-btn").onclick = () => window.location.reload();
+document.getElementById("close-lobby-btn").onclick = () => (ui.lobby.style.display = "none");
 
-document.getElementById("multiplayer-btn").addEventListener("click", async () => {
-  window.APP_MODE = "multiplayer";
-  app.mode = "multiplayer";
-  setVisible(ui.lobbyScreen, true);
-  try {
-    await initLobby();
-  } catch (err) {
-    console.error("Error initializing lobby:", err);
-    alert("Error: " + (err.message || String(err)));
-  }
-});
-
-document.getElementById("close-lobby-btn").addEventListener("click", () => setVisible(ui.lobbyScreen, false));
-document.getElementById("auto-join-btn").addEventListener("click", async () => {
-  try {
-    app.playerName = (document.getElementById("player-name").value || app.playerName).trim();
-    app.password = (document.getElementById("room-password").value || "").trim();
-    const result = await autoJoinRoom(app.playerName, app.password);
-    await joinAndEnter(result.roomId, { auto: true });
-  } catch (err) {
-    alert(err.message || String(err));
-  }
-});
-
-document.getElementById("manual-join-btn").addEventListener("click", async () => {
-  try {
-    app.playerName = (document.getElementById("player-name").value || app.playerName).trim();
-    const code = (document.getElementById("manual-room-code").value || "").trim().toUpperCase();
-    if (!code) throw new Error("Kode room kosong");
-    await joinAndEnter(code);
-  } catch (err) {
-    alert(err.message || String(err));
-  }
-});
-
-document.getElementById("create-room-btn").addEventListener("click", async () => {
-  try {
-    app.playerName = (document.getElementById("player-name").value || app.playerName).trim();
-    if (!app.playerName) throw new Error("Masukkan nama Anda");
-    
-    app.roomName = (document.getElementById("room-name").value || "").trim();
-    app.password = (document.getElementById("room-password").value || "").trim();
-    app.locked = document.getElementById("room-locked").checked;
-    
-    console.log("Creating room with:", { roomName: app.roomName, playerName: app.playerName });
-    const roomId = await createRoom({
-      roomName: app.roomName,
-      playerName: app.playerName,
-      password: app.password,
-      locked: app.locked
-    });
-    console.log("Room created:", roomId);
-    await joinAndEnter(roomId);
-  } catch (err) {
-    console.error("Error creating room:", err);
-    alert(err.message || String(err));
-  }
-});
-
-document.getElementById("leave-room-btn").addEventListener("click", async () => {
-  await leaveRoom();
-  setVisible(ui.roomScreen, false);
-  setVisible(ui.lobbyScreen, true);
-  await refreshRooms();
-});
-
-document.getElementById("room-chat-send").addEventListener("click", sendRoomChat);
-document.getElementById("play-chat-send").addEventListener("click", sendPlayChat);
-ui.roomChatInput.addEventListener("keydown", (e) => { if (e.key === "Enter") sendRoomChat(); });
-ui.playChatInput.addEventListener("keydown", (e) => { if (e.key === "Enter") sendPlayChat(); });
-
-document.getElementById("toggle-lock-btn").addEventListener("click", async () => {
-  app.locked = !app.locked;
-  await toggleLock(app.locked);
-});
-
-document.getElementById("start-room-btn").addEventListener("click", async () => {
-  try {
-    await startRoomGame();
-    
-    // Start the actual game locally with callback to sync state after dealing
-    if (window.JendralCore && typeof window.JendralCore.startNewRound === 'function') {
-      console.log("Starting new round with dealing callback");
-      const dealingCallback = async () => {
-        console.log("Dealing complete, syncing state to Firebase");
-        if (window.JendralCore && window.JendralCore.serializeState) {
-          const state = window.JendralCore.serializeState();
-          await writeGameState(state);
-        }
-      };
-      window.JendralCore.startNewRound(dealingCallback);
-    } else {
-      console.warn("JendralCore.startNewRound not available");
-    }
-    
-    setVisible(ui.roomScreen, false);
-    setVisible(ui.lobbyScreen, false);
-  } catch (err) {
-    console.error('Error starting room game:', err);
-    alert(err.message || String(err));
-  }
-});
-
-document.getElementById("toggle-chat-btn").addEventListener("click", () => {
-  const box = document.getElementById("room-chat-float");
-  box.style.display = box.style.display === "none" ? "block" : "none";
-});
-
-window.addEventListener("jendral:state-change", async (e) => {
-  if (window.APP_MODE !== "multiplayer") return;
-  if (!getCurrentRoomId()) return;
-  await writeGameState(e.detail);
-});
-
-window.addEventListener("jendral:open-lobby", async () => {
-  setVisible(ui.lobbyScreen, true);
-  await refreshRooms();
-});
-
-await initLobby();
-setVisible(ui.lobbyScreen, false);
-setVisible(ui.roomScreen, false);
+init();

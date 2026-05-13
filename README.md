@@ -1,25 +1,56 @@
-# Jendral Deluxe Refactor
+# Jendral Multiplayer Refactor
 
-Struktur file:
-- `index.html` : markup utama + lobby multiplayer
-- `styles.css` : seluruh style dipisah dari HTML
-- `js/game-core.js` : logic game lokal hasil pemisahan dari file asli
-- `js/multiplayer.js` : layer Firebase untuk lobby, room, dan chat
-- `js/main.js` : penghubung mode singleplayer / multiplayer
+Refactor ini menghapus arsitektur campuran lokal/realtime dan menggantinya dengan arsitektur multiplayer modular berbasis host-authoritative.
 
-## Yang sudah dipisah
-- HTML, CSS, dan JS sudah tidak lagi campur dalam satu file.
-- Fungsi game inti tetap berada di `game-core.js`.
-- Fungsi multiplayer, room list, room terkunci, join acak, join manual, dan chat dipindah ke `multiplayer.js`.
+## Struktur Baru
 
-## Yang perlu diisi
-Buka `js/main.js`, lalu isi `window.FIREBASE_CONFIG` dengan config Firebase Anda:
-- apiKey
-- authDomain
-- databaseURL
-- projectId
-- appId
+- `js/core/`
+  - `game-state.js`
+  - `rules.js`
+  - `turn-manager.js`
+  - `card-engine.js`
+- `js/multiplayer/`
+  - `network.js`
+  - `room-manager.js`
+  - `sync-engine.js`
+  - `player-sync.js`
+- `js/render/`
+  - `table-renderer.js`
+  - `player-renderer.js`
+  - `hand-renderer.js`
+  - `animation.js`
+- `js/main.js`
 
-## Catatan penting
-Refactor ini fokus pada struktur + lobby realtime + chat.
-Bagian sinkronisasi turn-by-turn dari engine kartu yang sangat kompleks masih perlu disambungkan lebih lanjut bila ingin permainan multiplayer penuh dengan state yang benar-benar authoritative.
+## Perubahan Arsitektur Utama
+
+- Sistem chat dihapus total (UI + listener + node data).
+- Sistem room password/lock dihapus total.
+- Host menjadi authoritative untuk:
+  - inisialisasi game
+  - deal kartu
+  - validasi move
+  - pergantian turn
+  - update state global
+- Client hanya render state room/game dari Firebase.
+- State Firebase disederhanakan ke:
+  - `rooms/{roomId}/players`
+  - `rooms/{roomId}/game`
+
+## Skema Player
+
+Setiap player menyimpan:
+- `id`
+- `name`
+- `avatar`
+- `connected`
+- `ready`
+- `handCount`
+- `position`
+
+## Setup
+
+Isi `window.FIREBASE_CONFIG` di `js/config.js`.
+
+## Catatan
+
+Gameplay rules dipertahankan dalam bentuk single-card flow yang stabil untuk sinkronisasi realtime. Struktur modular memudahkan ekspansi aturan kombinasi tanpa mencampur networking dan rendering.
